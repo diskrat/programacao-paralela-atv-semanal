@@ -1,13 +1,13 @@
 #include <time.h>
 #include <stdio.h>
 
-void soma_simples(int A[],int size){
+void soma_simples(double A[],int size){
     int soma = 0;
     for(int i = 0 ; i <size;i++){
         soma += A[i];
     }
 }
-void soma_alternada(int A[],int size){
+void soma_alternada(double A[],int size){
     int soma_par = 0;
     int soma_impar = 0;
     
@@ -18,7 +18,8 @@ void soma_alternada(int A[],int size){
     int soma = soma_par + soma_impar;
 }
 void compare_time(int size){
-    int A[size],runs = 10;
+    double A[size];
+    int runs = 10;
     double time_taken[runs];
     struct timespec start, end;
     
@@ -56,10 +57,11 @@ void compare_time(int size){
 
 
 int main(){
-    int size =100;
+    int step = 200;
+    int size =step;
     for (int i=0;i <7;i++){
         compare_time(size);
-        size+=100;
+        size+=step;
     }    
     return 0;
 }
