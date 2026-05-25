@@ -1,5 +1,6 @@
 #include <time.h>
 #include <stdio.h>
+#include <linux/time.h>
 
 void soma_simples(double A[],int size){
     int soma = 0;
