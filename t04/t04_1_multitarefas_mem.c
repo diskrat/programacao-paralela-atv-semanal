@@ -1,13 +1,36 @@
-#include <omp.h>
+#include <time.h>
 #include <stdio.h>
+#include <linux/time.h>
 #include <stdlib.h>
+#include <limits.h>
+#define RUNS 20
+
+
+void soma_simples(int* a, int* b, int* c, int size){
+#pragma omp parallel for
+    for (size_t i = 0; i < size; ++i) {
+        c[i] = a[i] + b[i];
+    }
+}
+
+double test_func(int size, void (*func)(int*,int*,int*, int), int* A, int* B, int* C, int runs) {
+    struct timespec start, end;
+    double time_sum = 0;
+    for (int i = 0; i < runs; i++) {
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        func(A,B,C, size);
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        double elapsed = (end.tv_sec - start.tv_sec) * 1e3 + (end.tv_nsec - start.tv_nsec) / 1e6;
+        time_sum += elapsed;
+    }
+    return time_sum / runs;
+}
 
 int main(void) {
-    const size_t N = 64 * 1024 * 1024;
-
-    double *a = malloc(N * sizeof(double));
-    double *b = malloc(N * sizeof(double));
-    double *c = malloc(N * sizeof(double));
+    const long N = 64 * 1024 * 1024;
+    int *a = malloc(N * sizeof(int));
+    int *b = malloc(N * sizeof(int));
+    int *c = malloc(N * sizeof(int));
     if (!a || !b || !c) {
         fprintf(stderr, "falha na alocação de memória\n");
         return 1;
@@ -15,21 +38,18 @@ int main(void) {
 
 
     for (size_t i = 0; i < N; ++i) {
-        a[i] = (double)i * 1.0;
-        b[i] = (double)i * 2.0;
-        c[i] = 0.0;
+        a[i] = i * 1;
+        b[i] = i * 2;
+        c[i] = 0;
     }
-#pragma omp parallel for
-    for (size_t i = 0; i < N; ++i) {
-        c[i] = a[i] + b[i];
-    }
+    double total_time = test_func(N,soma_simples,a,b,c,RUNS);
 
-    double checksum = 0.0;
-
-    for (size_t i = 0; i < N; ++i) {
-        checksum += c[i];
-    }
-    printf("checksum: %f\n", checksum);
+     unsigned long total = 0;
+     for (size_t i = 0; i < N; i++) {
+         total += c[i];
+     }
+     printf("TEMPO:%.3f ms; resultado: %ld\n",total_time, total);
+    
     free(a);
     free(b);
     free(c);
