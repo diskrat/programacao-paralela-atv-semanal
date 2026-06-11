@@ -38,6 +38,6 @@ int main(void) {
         }
         #pragma omp taskwait
     }
-
+    
     return 0;
 }
