@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <omp.h>
 
-#define N 10000000
+#define N 1e7
 
 int main(void) {
     long n = N;
