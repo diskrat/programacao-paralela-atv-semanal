@@ -56,6 +56,7 @@ double count_vector(long shots,rand_func rand_f,unsigned int seed){
         }
     }
     for (int i = 0; i < max_threads;i++) count_global+=arr[i];
+    free(arr);
     return 4.0 * (double)count_global / (double)shots;
 }
 
