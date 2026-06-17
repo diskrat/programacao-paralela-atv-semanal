@@ -1,0 +1,4 @@
+[acumulador + rand()]   pi ~= 3.141458400000, tempo medio = 1949.205379 ms (1 execucoes)
+[vetor + rand()]        pi ~= 3.142180400000, tempo medio = 2187.730932 ms (1 execucoes)
+[acumulador + rand_r()] pi ~= 3.092559200000, tempo medio = 173.064493 ms (1 execucoes)
+[vetor + rand_r()]      pi ~= 3.113464800000, tempo medio = 270.865739 ms (1 execucoes)
