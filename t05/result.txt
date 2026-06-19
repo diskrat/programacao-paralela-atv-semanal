@@ -1,0 +1,2 @@
+serial:		 8391 ms;	Valor: 664579
+paralela:	 1629 ms;	Valor: 610670
