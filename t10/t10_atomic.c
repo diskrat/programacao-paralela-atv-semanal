@@ -21,7 +21,8 @@ double count_vector(long shots,unsigned int *seed){
             double y = (double)rand_r(&thread_seed) / RAND_MAX;
             if (x * x + y * y <= 1.0) {
                 {
-                    #pragma omp critical
+                    // #pragma omp critical
+                    #pragma omp atomic
                     arr[omp_get_thread_num()]++;
                 }
             }
