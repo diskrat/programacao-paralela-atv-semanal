@@ -1,12 +1,71 @@
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <time.h>
 
-#define NX 150           // Resolução no eixo X
-#define NY 150           // Resolução no eixo Y
-#define NZ 150           // Resolução no eixo Z
+#define NX 64           // Resolução no eixo X
+#define NY 64           // Resolução no eixo Y
+#define NZ 64           // Resolução no eixo Z
 #define STEPS 200        // Passos no tempo
 #define TOTAL_SIZE (NX * NY * NZ)
+
+void salvar_vti_para_web(const char* nome_arquivo, double* u, double* v, double* w, int nx, int ny, int nz) {
+    FILE* f = fopen(nome_arquivo, "w");
+    if (!f) {
+        printf("Erro ao criar arquivo VTI.\n");
+        return;
+    }
+
+    // O formato VTI define o domínio pelo "Extent" (índices iniciais e finais)
+    int ex_x = nx - 1;
+    int ex_y = ny - 1;
+    int ex_z = nz - 1;
+
+    // 1. Cabeçalho XML e Definição da Malha (ImageData)
+    fprintf(f, "<?xml version=\"1.0\"?>\n");
+    fprintf(f, "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n");
+    fprintf(f, "  <ImageData WholeExtent=\"0 %d 0 %d 0 %d\" Origin=\"0 0 0\" Spacing=\"1 1 1\">\n", ex_x, ex_y, ex_z);
+    fprintf(f, "    <Piece Extent=\"0 %d 0 %d 0 %d\">\n", ex_x, ex_y, ex_z);
+    
+    // 2. Início dos Dados dos Pontos
+    fprintf(f, "      <PointData Scalars=\"magnitude\" Vectors=\"velocidade\">\n");
+
+    // --- CAMPO 1: Escalar (Magnitude) ---
+    // Usamos Float32 para economizar banda na web
+    fprintf(f, "        <DataArray type=\"Float32\" Name=\"magnitude\" format=\"ascii\">\n");
+    for (int i = 0; i < nx; i++) {
+        for (int j = 0; j < ny; j++) {
+            for (int k = 0; k < nz; k++) {
+                int idx = (i * ny + j) * nz + k;
+                float mag = (float)sqrt(u[idx]*u[idx] + v[idx]*v[idx] + w[idx]*w[idx]);
+                fprintf(f, "          %f\n", mag);
+            }
+        }
+    }
+    fprintf(f, "        </DataArray>\n");
+
+    // --- CAMPO 2: Vetores (Velocidade) ---
+    // NumberOfComponents="3" diz explicitamente que são vetores 3D
+    fprintf(f, "        <DataArray type=\"Float32\" Name=\"velocidade\" NumberOfComponents=\"3\" format=\"ascii\">\n");
+    for (int i = 0; i < nx; i++) {
+        for (int j = 0; j < ny; j++) {
+            for (int k = 0; k < nz; k++) {
+                int idx = (i * ny + j) * nz + k;
+                fprintf(f, "          %f %f %f\n", (float)u[idx], (float)v[idx], (float)w[idx]);
+            }
+        }
+    }
+    fprintf(f, "        </DataArray>\n");
+
+    // 3. Fechamento das Tags XML
+    fprintf(f, "      </PointData>\n");
+    fprintf(f, "    </Piece>\n");
+    fprintf(f, "  </ImageData>\n");
+    fprintf(f, "</VTKFile>\n");
+
+    fclose(f);
+    printf("Arquivo '%s' salvo em formato XML para vtk.js.\n", nome_arquivo);
+}
 
 int main() {
     double dx = 1.0, dy = 1.0, dz = 1.0;
@@ -102,6 +161,8 @@ int main() {
     int c_idx = ((NX / 2) * NY + (NY / 2)) * NZ + (NZ / 2);
     printf("Velocidade no centro geométrico: U=%.4f, V=%.4f, W=%.4f\n", u[c_idx], v[c_idx], w[c_idx]);
 
+    // Salvar vtk
+    salvar_vti_para_web("saida_fluido.vti", u, v, w, NX, NY, NZ);
     // Liberação de memória
     free(u); free(v); free(w);
     free(u_new); free(v_new); free(w_new);
