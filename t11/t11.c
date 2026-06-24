@@ -3,68 +3,28 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define NX 64           // Resolução no eixo X
-#define NY 64           // Resolução no eixo Y
-#define NZ 64           // Resolução no eixo Z
-#define STEPS 200        // Passos no tempo
+#define NX 32           // Resolução no eixo X
+#define NY 32           // Resolução no eixo Y
+#define NZ 32           // Resolução no eixo Z
+#define STEPS 900       // Passos no tempo
 #define TOTAL_SIZE (NX * NY * NZ)
 
-void salvar_vti_para_web(const char* nome_arquivo, double* u, double* v, double* w, int nx, int ny, int nz) {
-    FILE* f = fopen(nome_arquivo, "w");
-    if (!f) {
-        printf("Erro ao criar arquivo VTI.\n");
-        return;
-    }
+// Função para guardar o frame atual no ficheiro CSV
+void salvar_frame_csv(FILE* f, int frame_id, double* u, double* v, double* w, int nx, int ny, int nz) {
+    // Limiar: Apenas guarda pontos com velocidade considerável
+    // Isto evita um CSV gigante cheio de zeros
 
-    // O formato VTI define o domínio pelo "Extent" (índices iniciais e finais)
-    int ex_x = nx - 1;
-    int ex_y = ny - 1;
-    int ex_z = nz - 1;
-
-    // 1. Cabeçalho XML e Definição da Malha (ImageData)
-    fprintf(f, "<?xml version=\"1.0\"?>\n");
-    fprintf(f, "<VTKFile type=\"ImageData\" version=\"0.1\" byte_order=\"LittleEndian\">\n");
-    fprintf(f, "  <ImageData WholeExtent=\"0 %d 0 %d 0 %d\" Origin=\"0 0 0\" Spacing=\"1 1 1\">\n", ex_x, ex_y, ex_z);
-    fprintf(f, "    <Piece Extent=\"0 %d 0 %d 0 %d\">\n", ex_x, ex_y, ex_z);
-    
-    // 2. Início dos Dados dos Pontos
-    fprintf(f, "      <PointData Scalars=\"magnitude\" Vectors=\"velocidade\">\n");
-
-    // --- CAMPO 1: Escalar (Magnitude) ---
-    // Usamos Float32 para economizar banda na web
-    fprintf(f, "        <DataArray type=\"Float32\" Name=\"magnitude\" format=\"ascii\">\n");
     for (int i = 0; i < nx; i++) {
         for (int j = 0; j < ny; j++) {
             for (int k = 0; k < nz; k++) {
                 int idx = (i * ny + j) * nz + k;
-                float mag = (float)sqrt(u[idx]*u[idx] + v[idx]*v[idx] + w[idx]*w[idx]);
-                fprintf(f, "          %f\n", mag);
+                
+                // Calcula a magnitude da velocidade (tamanho do vetor)
+                double mag = sqrt(u[idx]*u[idx] + v[idx]*v[idx] + w[idx]*w[idx]);
+                fprintf(f, "%d,%d,%d,%d,%lf\n", frame_id, i, j, k, mag);
             }
         }
     }
-    fprintf(f, "        </DataArray>\n");
-
-    // --- CAMPO 2: Vetores (Velocidade) ---
-    // NumberOfComponents="3" diz explicitamente que são vetores 3D
-    fprintf(f, "        <DataArray type=\"Float32\" Name=\"velocidade\" NumberOfComponents=\"3\" format=\"ascii\">\n");
-    for (int i = 0; i < nx; i++) {
-        for (int j = 0; j < ny; j++) {
-            for (int k = 0; k < nz; k++) {
-                int idx = (i * ny + j) * nz + k;
-                fprintf(f, "          %f %f %f\n", (float)u[idx], (float)v[idx], (float)w[idx]);
-            }
-        }
-    }
-    fprintf(f, "        </DataArray>\n");
-
-    // 3. Fechamento das Tags XML
-    fprintf(f, "      </PointData>\n");
-    fprintf(f, "    </Piece>\n");
-    fprintf(f, "  </ImageData>\n");
-    fprintf(f, "</VTKFile>\n");
-
-    fclose(f);
-    printf("Arquivo '%s' salvo em formato XML para vtk.js.\n", nome_arquivo);
 }
 
 int main() {
@@ -86,7 +46,7 @@ int main() {
         return 1;
     }
 
-    // 1. Inicialização e Perturbação em um cubo central (Execução Serial)
+    // 1. Inicialização e Perturbação num cubo central
     for (int i = 0; i < NX; i++) {
         for (int j = 0; j < NY; j++) {
             for (int k = 0; k < NZ; k++) {
@@ -106,8 +66,22 @@ int main() {
         }
     }
 
-    // Medição de tempo usando a biblioteca padrão <time.h>
     clock_t start_time = clock();
+
+    // Controlo para guardar quadros da animação
+    int salvar_a_cada = 10; // Tira uma "foto" a cada 10 passos
+    int frame_id = 0;
+
+    // Abre o ficheiro CSV uma única vez antes do loop temporal
+    FILE* arquivo_csv = fopen("animacao_completa.csv", "w");
+    if (arquivo_csv) {
+        fprintf(arquivo_csv, "frame,x,y,z,magnitude\n"); // Cabeçalho do CSV
+    } else {
+        // Liberta memória antes de sair em caso de erro
+        free(u); free(v); free(w);
+        free(u_new); free(v_new); free(w_new);
+        return 1;
+    }
 
     // 2. Loop de Evolução Temporal
     for (int t = 0; t < STEPS; t++) {
@@ -117,7 +91,7 @@ int main() {
                 for (int k = 1; k < NZ - 1; k++) {
                     int idx = (i * NY + j) * NZ + k;
 
-                    // Stencil de Diferenças Finitas em 3D (7 pontos)
+                    // Stencil de Diferenças Finitas em 3D
                     double u_xx = (u[idx + NY*NZ] - 2.0 * u[idx] + u[idx - NY*NZ]) / (dx * dx);
                     double u_yy = (u[idx + NZ]    - 2.0 * u[idx] + u[idx - NZ])    / (dy * dy);
                     double u_zz = (u[idx + 1]     - 2.0 * u[idx] + u[idx - 1])     / (dz * dz);
@@ -136,10 +110,9 @@ int main() {
             }
         }
 
-        // 3. Condições de Contorno (Paredes do cubo com velocidade zero)
+        // 3. Condições de Contorno (Faces nas extremidades)
         for (int j = 0; j < NY; j++) {
             for (int k = 0; k < NZ; k++) {
-                // Faces X min e X max
                 int idx_min = (0 * NY + j) * NZ + k;
                 int idx_max = ((NX - 1) * NY + j) * NZ + k;
                 u_new[idx_min] = v_new[idx_min] = w_new[idx_min] = 0.0;
@@ -147,22 +120,28 @@ int main() {
             }
         }
 
-        // Troca de ponteiros (Swap rápido)
+        // Troca de ponteiros para preparar o próximo passo
         double *tmp_u = u; u = u_new; u_new = tmp_u;
         double *tmp_v = v; v = v_new; v_new = tmp_v;
         double *tmp_w = w; w = w_new; w_new = tmp_w;
+
+        // 4. SALVAR FRAME NO TEMPO (No mesmo CSV)
+        if (t % salvar_a_cada == 0 && arquivo_csv) {
+            salvar_frame_csv(arquivo_csv, frame_id, u, v, w, NX, NY, NZ);
+            frame_id++;
+        }
+    }
+
+    // Fecha o ficheiro CSV no final de toda a simulação
+    if (arquivo_csv) {
+        fclose(arquivo_csv);
     }
 
     clock_t end_time = clock();
     double cpu_time_used = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
     
-    printf("Simulação 3D Serial concluída em %.4f segundos.\n", cpu_time_used);
+    printf("Simulação 3D concluída em %.4f segundos.\n", cpu_time_used);
 
-    int c_idx = ((NX / 2) * NY + (NY / 2)) * NZ + (NZ / 2);
-    printf("Velocidade no centro geométrico: U=%.4f, V=%.4f, W=%.4f\n", u[c_idx], v[c_idx], w[c_idx]);
-
-    // Salvar vtk
-    salvar_vti_para_web("saida_fluido.vti", u, v, w, NX, NY, NZ);
     // Liberação de memória
     free(u); free(v); free(w);
     free(u_new); free(v_new); free(w_new);
