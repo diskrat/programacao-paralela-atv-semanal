@@ -3,10 +3,11 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define NX 32           // Resolução no eixo X
-#define NY 32           // Resolução no eixo Y
-#define NZ 32           // Resolução no eixo Z
-#define STEPS 900       // Passos no tempo
+#define SIZE 16
+#define NX SIZE           // Resolução no eixo X
+#define NY SIZE           // Resolução no eixo Y
+#define NZ SIZE           // Resolução no eixo Z
+#define STEPS 2500       // Passos no tempo
 #define TOTAL_SIZE (NX * NY * NZ)
 
 // Função para guardar o frame atual no ficheiro CSV
@@ -21,7 +22,7 @@ void salvar_frame_csv(FILE* f, int frame_id, double* u, double* v, double* w, in
                 
                 // Calcula a magnitude da velocidade (tamanho do vetor)
                 double mag = sqrt(u[idx]*u[idx] + v[idx]*v[idx] + w[idx]*w[idx]);
-                fprintf(f, "%d,%d,%d,%d,%lf\n", frame_id, i, j, k, mag);
+                if (mag > 0.01) fprintf(f, "%d,%d,%d,%d,%lf\n", frame_id, i, j, k, mag);
             }
         }
     }
@@ -53,10 +54,15 @@ int main() {
                 int idx = (i * NY + j) * NZ + k;
                 u[idx] = 0.0; v[idx] = 0.0; w[idx] = 0.0;
 
-                // Perturbação volumétrica no centro do domínio
-                if (i > NX/2 - 10 && i < NX/2 + 10 &&
-                    j > NY/2 - 10 && j < NY/2 + 10 &&
-                    k > NZ/2 - 10 && k < NZ/2 + 10) {
+                // Raio da perturbação (2 unidades para um grid de 16)
+                int raio = 2;
+                
+                // Perturbação volumétrica restrita ESTRITAMENTE ao centro
+                if (i >= NX/2 - raio && i <= NX/2 + raio &&
+                    j >= NY/2 - raio && j <= NY/2 + raio &&
+                    k >= NZ/2 - raio && k <= NZ/2 + raio) {
+                    
+                    // Intensidade inicial
                     u[idx] = 10.0;
                     v[idx] = 10.0;
                     w[idx] = 10.0;
